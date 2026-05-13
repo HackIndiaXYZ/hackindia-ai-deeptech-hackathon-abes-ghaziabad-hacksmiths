@@ -41,22 +41,22 @@ import FinancialGlossary from './pages/FinancialGlossary';
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const [loading, setLoading] = useState(true);
-  const [isDemo, setIsDemo] = useState(true);
+
+  // isDemo is true only if no real AI health score has been generated yet
+  const isDemo = !state.healthScore;
 
   const showChatAssistant = !['/', '/onboarding'].includes(location.pathname);
   const showSidebar = !['/', '/onboarding', '/loading'].includes(location.pathname);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1500);
-    dispatch({ type: 'SET_USER_DATA', payload: { name: 'Rahul', age: 28, income: 85000, expenses: 55000, emergencyFund: 200000, termInsurance: false, healthInsurance: 'employer only', mutualFunds: 50000, fd: 0, stocks: 0, gold: 0, debt: 300000, emi: 10300 } });
     return () => clearTimeout(t);
-  }, [dispatch]);
+  }, []);
 
   const exitDemo = () => {
-    setIsDemo(false);
-    dispatch({ type: 'SET_USER_DATA', payload: {} });
+    dispatch({ type: 'RESET_STATE' });
     navigate('/onboarding');
   };
 

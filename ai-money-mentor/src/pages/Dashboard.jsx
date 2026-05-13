@@ -16,11 +16,24 @@ import gsap from 'gsap';
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
-  const userData = state.userData || { name: 'Rahul', monthlyIncome: 85000, monthlyExpenses: 55000, investments: 50000, debtAmount: 300000 };
-  const healthData = state.healthScore || { score: 72, actions: [{title: "Open PPF", desc: "Start 80C tax saving"}, {title: "Buy Term Plan", desc: "Protect your family"}, {title: "Increase SIP", desc: "Beat inflation"}] };
+  const userData = state.userData || {};
+  const healthData = state.healthScore || { score: 0, actions: [] };
   
-  const surplus = Number(userData.monthlyIncome) - Number(userData.monthlyExpenses);
-  const fireYear = new Date().getFullYear() + 15; // mock
+  const surplus = Number(userData.monthlyIncome || 0) - Number(userData.monthlyExpenses || 0);
+  // Compute FIRE year: corpus needed = 25x annual expenses (4% rule)
+  const annualExpenses = Number(userData.monthlyExpenses || 55000) * 12;
+  const fireCorpusNeeded = annualExpenses * 25;
+  const currentCorpus = Number(userData.investments || 0) + Number(userData.savings || 0);
+  const monthlySurplus = Math.max(surplus, 1000);
+  // Rough FIRE estimate: how many months to reach target at 12% annualized return
+  const monthsToFire = fireCorpusNeeded > currentCorpus
+    ? Math.ceil(Math.log(fireCorpusNeeded / currentCorpus) / Math.log(1 + 0.01)) // simplified at 1%/mo
+    : 0;
+  const fireYear = new Date().getFullYear() + Math.round(monthsToFire / 12);
+  // Emergency fund coverage in months
+  const emergencyMonths = userData.monthlyExpenses > 0
+    ? (Number(userData.savings || 0) / Number(userData.monthlyExpenses)).toFixed(1)
+    : '—';
   const [insights, setInsights] = useState(null);
   
   useEffect(() => {
@@ -98,7 +111,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="h-40 w-full">
-                <MiniChart />
+                <MiniChart startCorpus={currentCorpus} monthlySurplus={monthlySurplus} />
               </div>
             </div>
 
@@ -107,9 +120,9 @@ export default function Dashboard() {
           {/* Quick Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard title="Monthly Surplus" value={surplus} prefix="₹" icon={<Activity className="text-green-400 w-8 h-8"/>} delay={0.1} />
-            <StatCard title="Total Investments" value={userData.investments} prefix="₹" icon={<TrendingUp className="text-blue-400 w-8 h-8"/>} delay={0.2} />
-            <StatCard title="Debt Remaining" value={userData.debtAmount || 0} prefix="₹" icon={<AlertCircle className="text-red-400 w-8 h-8"/>} delay={0.3} />
-            <StatCard title="Emergency Fund" value="4.2" suffix=" mo" icon={<ShieldCheck className="text-gold w-8 h-8"/>} delay={0.4} />
+            <StatCard title="Total Investments" value={Number(userData.investments || 0)} prefix="₹" icon={<TrendingUp className="text-blue-400 w-8 h-8"/>} delay={0.2} />
+            <StatCard title="Debt Remaining" value={Number(userData.debtAmount || 0)} prefix="₹" icon={<AlertCircle className="text-red-400 w-8 h-8"/>} delay={0.3} />
+            <StatCard title="Emergency Fund" value={emergencyMonths} suffix=" mo" icon={<ShieldCheck className="text-gold w-8 h-8"/>} delay={0.4} />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
@@ -215,8 +228,14 @@ function StatCard({ title, value, prefix='', suffix='', icon, delay }) {
   );
 }
 
-function MiniChart() {
-  const data = Array.from({length: 20}).map((_,i) => ({ age: 30+i, value: 10 + i*i*0.5 + Math.random()*20 }));
+function MiniChart({ startCorpus = 50000, monthlySurplus = 30000 }) {
+  // Project wealth over 20 years using 1%/month compounding on surplus
+  const data = Array.from({ length: 20 }).map((_, i) => {
+    const months = i * 12;
+    const futureValue = startCorpus * Math.pow(1.01, months) +
+      monthlySurplus * ((Math.pow(1.01, months) - 1) / 0.01);
+    return { age: new Date().getFullYear() + i, value: Math.round(futureValue / 100000) };
+  });
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={data}>

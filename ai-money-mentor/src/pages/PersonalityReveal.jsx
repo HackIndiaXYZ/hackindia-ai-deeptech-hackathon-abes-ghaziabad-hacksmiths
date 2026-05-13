@@ -7,14 +7,19 @@ import { useApp } from '../context/AppContext';
 import { pageEnter, fadeUp } from '../animations/variants';
 import { countUpNumber } from '../animations/gsapHelpers';
 
+import { useNavigate } from 'react-router-dom';
+
 export default function PersonalityReveal() {
   const { state } = useApp();
-  const rawScore = state.healthScore || {
-    personality: "Balanced Builder", match: 89,
-    strength: "High savings velocity, diversified core", 
-    weakness: "Could optimize tax on debt funds", 
-    tip: "Shift liquid funds to arbitrage for better post-tax returns."
-  };
+  const navigate = useNavigate();
+  const rawScore = state.healthScore;
+
+  // Redirect if no real data
+  useEffect(() => {
+    if (!rawScore) navigate('/onboarding');
+  }, [rawScore, navigate]);
+
+  if (!rawScore) return null;
 
   const [flipped, setFlipped] = useState(false);
   const [showDetails, setShowDetails] = useState(false);

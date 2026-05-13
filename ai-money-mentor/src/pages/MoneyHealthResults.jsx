@@ -11,19 +11,21 @@ import { useApp } from '../context/AppContext';
 import { countUpNumber, drawSVGPath } from '../animations/gsapHelpers';
 import Logo from '../components/Logo';
 
+import { useNavigate } from 'react-router-dom';
+
 export default function MoneyHealthResults() {
   const { state } = useApp();
-  const rawScore = state.healthScore || {
-    score: 64, verdict: "You have a solid foundation but significant gaps in tax optimization.", percentile: 68,
-    strength: "Strong savings habit", weakness: "Under-utilized 80C limit", personality: "Balanced Builder",
-    actions: [
-      { title: "Open a PPF Account", desc: "Start contributing to PPF to max out 80C and get risk-free tax-free returns.", time: "15 mins", impact: 46000 },
-      { title: "Review Term Insurance", desc: "You only have employer cover. Buy a pure term life insurance plan.", time: "30 mins", impact: 10000000 },
-      { title: "Automate SIPs", desc: "Set up auto-debit for your mutual fund SIPs on the 5th of every month.", time: "10 mins", impact: 60000 },
-      { title: "Build Emergency Fund", desc: "Move your 2 lakh savings into a separate sweep-in FD for liquidity.", time: "20 mins", impact: 10000 },
-      { title: "Claim HRA", desc: "Submit your rent receipts to your employer immediately.", time: "5 mins", impact: 25000 }
-    ]
-  };
+  const navigate = useNavigate();
+  const rawScore = state.healthScore;
+
+  // If no real health score exists, redirect to onboarding
+  useEffect(() => {
+    if (!rawScore) {
+      navigate('/onboarding');
+    }
+  }, [rawScore, navigate]);
+
+  if (!rawScore) return null;
 
   const [doorsOpen, setDoorsOpen] = useState(false);
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function MoneyHealthResults() {
         </div>
 
         {/* Financial Dimensions — Creative Cards */}
-        <FinancialDimensions />
+        <FinancialDimensions healthScore={rawScore} />
 
         {/* Comparison Section */}
         <CompareSection percentile={rawScore.percentile} />
@@ -209,16 +211,76 @@ function PersonalityBadge({ type, strength }) {
    PREMIUM: FinancialDimensions — Radial Arc Chart + Detail Cards
    A stunning concentric ring chart paired with interactive cards.
    ============================================================ */
-function FinancialDimensions() {
+function FinancialDimensions({ healthScore }) {
   const [active, setActive] = useState(null);
 
+  // Derive per-dimension scores from the AI health score
+  const overallScore = healthScore?.score || 64;
+  const weakness = (healthScore?.weakness || '').toLowerCase();
+  const strength = (healthScore?.strength || '').toLowerCase();
+
+  const derive = (base, boostIfStrength, penalizeIfWeakness) => {
+    let s = base;
+    if (strength.includes(boostIfStrength)) s = Math.min(100, s + 15);
+    if (weakness.includes(penalizeIfWeakness)) s = Math.max(10, s - 20);
+    return Math.round(s);
+  };
+
   const dims = [
-    { name: 'Emergency Fund', score: 90, emoji: '🛡️', advice: 'Excellent liquidity — you can handle 6+ months of expenses.', color: '#22c55e' },
-    { name: 'Debt Health', score: 85, emoji: '⚖️', advice: 'Minimal bad debt. Your EMI-to-income ratio is healthy.', color: '#3b82f6' },
-    { name: 'Investments', score: 75, emoji: '📈', advice: 'Good equity mix but diversify into international funds.', color: '#F5A623' },
-    { name: 'Retirement', score: 65, emoji: '🏖️', advice: 'Increase your SIP by ₹5,000/mo to retire 3 years earlier.', color: '#a855f7' },
-    { name: 'Tax Efficiency', score: 40, emoji: '🧾', advice: 'You\'re leaving ₹46,800 on the table under Section 80C.', color: '#f97316' },
-    { name: 'Insurance', score: 30, emoji: '🏥', advice: 'Critically underinsured. Get a ₹1Cr term plan immediately.', color: '#ef4444' },
+    {
+      name: 'Emergency Fund',
+      score: derive(Math.round(overallScore * 0.95), 'saving', 'emergency'),
+      emoji: '🛡️',
+      advice: weakness.includes('emergency')
+        ? `Your emergency fund needs attention — aim for 6 months of expenses (₹${((healthScore?.actions?.[0]?.impact || 50000)).toLocaleString('en-IN')}).`
+        : 'Good liquidity — keep building towards 6+ months of expenses.',
+      color: '#22c55e'
+    },
+    {
+      name: 'Debt Health',
+      score: derive(Math.round(overallScore * 0.9), 'debt free', 'debt'),
+      emoji: '⚖️',
+      advice: weakness.includes('debt') || weakness.includes('loan')
+        ? 'Your EMI-to-income ratio needs work. Prioritize clearing high-interest debt first.'
+        : 'Debt levels look manageable. Keep your EMI below 40% of income.',
+      color: '#3b82f6'
+    },
+    {
+      name: 'Investments',
+      score: derive(Math.round(overallScore * 0.85), 'invest', 'invest'),
+      emoji: '📈',
+      advice: weakness.includes('invest') || weakness.includes('sip')
+        ? 'Start or increase your SIP contributions to build long-term wealth.'
+        : 'Good equity exposure. Consider diversifying into international funds.',
+      color: '#F5A623'
+    },
+    {
+      name: 'Retirement',
+      score: derive(Math.round(overallScore * 0.75), 'nps', 'retirement'),
+      emoji: '🏖️',
+      advice: weakness.includes('retirement') || weakness.includes('ppf')
+        ? 'Start contributing to NPS/PPF immediately to secure your retirement.'
+        : 'On track — increase SIP by ₹5,000/mo to retire 3 years earlier.',
+      color: '#a855f7'
+    },
+    {
+      name: 'Tax Efficiency',
+      score: derive(Math.round(overallScore * 0.6), 'tax', '80c'),
+      emoji: '🧾',
+      advice: weakness.includes('tax') || weakness.includes('80c')
+        ? `You may be leaving significant money on the table under Section 80C. Max it out.`
+        : 'Tax planning looks decent. Explore NPS for additional ₹50,000 deduction.',
+      color: '#f97316'
+    },
+    {
+      name: 'Insurance',
+      score: derive(Math.round(overallScore * 0.5), 'insur', 'insur'),
+      emoji: '🏥',
+      advice: weakness.includes('insur')
+        ? 'Critically underinsured. Get a ₹1Cr term plan and a ₹10L health cover immediately.'
+        : 'Insurance coverage is adequate. Review your sum assured annually.',
+      color: '#ef4444'
+    },
   ];
 
   const getLabel = (score) => {

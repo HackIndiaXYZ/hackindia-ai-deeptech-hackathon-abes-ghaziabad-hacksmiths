@@ -31,6 +31,8 @@ function appReducer(state, action) {
       return { ...state, hasCompletedOnboarding: true };
     case 'SET_DEMO_DATA':
       return { ...state, demoData: action.payload };
+    case 'RESET_STATE':
+      return { ...initialState };
     default:
       return state;
   }
